@@ -3,17 +3,18 @@ import requests
 from discord import Intents, Interaction, ButtonStyle, InteractionType
 from discord.ext.commands import Bot, Context
 from discord.embeds import Embed
-from discord.ext import commands, menus
+from discord.ext import commands
 from utils.config import Config
 from discord.ui import View, Button, button
 
-
 import discord
+
+
 
 class DiscordBot():
     def __init__(self, config: Config = None):
         self._config = (config or Config())
-        self._bot = self.create_client()
+        self._bot : Bot= self.create_client()
         self._load_configs()
         self.add_events()
         self.add_commands()
@@ -24,6 +25,7 @@ class DiscordBot():
 
     def init_atributes(self):
         self._repository: str = ""
+        self._user: str = ""
 
 
     def create_client(self) -> Bot:
@@ -49,8 +51,8 @@ class DiscordBot():
 
             for pull_request in pull_requests:
                 embed: Embed = Embed(
-                    title="Pull request aberto",
-                    description="teste",
+                    title="Pull request: [{}]".format(pull_request["title"]),
+                    description='''Descriçaõ: {} \nCriado: {}\n Ultimo update: {}'''.format(pull_request["body"], pull_request["created_at"], pull_request["updated_at"]),
                     url=pull_request["html_url"],
                 )
                 await ctx.send(embed=embed)
@@ -58,7 +60,7 @@ class DiscordBot():
         @self._bot.command(name="config")
         # async def configs_options(ctx: Context):
 
-        async def _button(ctx: commands.Context):  # Altere de Interaction.CommandContext para commands.Context
+        async def _button(ctx: Context):  # Altere de Interaction.CommandContext para commands.Context
             # view = ConfigMenu()
             button = Button(label="Clique")
             async def button_callback(interaction:discord.Interaction):
@@ -67,8 +69,29 @@ class DiscordBot():
             button.callback = button_callback
             view = View()
             view.add_item(button)
-            view.
+
             await ctx.send("hi", view=view)
+
+        @self._bot.command(name="set_config")
+        async def set_new_config(ctx: Context):
+            message = '1 - Adicionar novas configurações \n2 - Mostrar configurações atuais'
+            embed = Embed(title="Menu de Configurações", description=message)
+
+            view = ConfigMenu(timeout=50)
+
+            message = await ctx.send(embed=embed,view=view)
+            view.message = message
+            await view.wait()
+            await view.disable_all_items()
+            if view.option_1 is None:
+                print("Timeout")
+
+            elif view.option_2 is True:
+                print("Ok")
+                config = "Github User: {}\n Github repository: {}".format(self._user, self._repository)
+                await ctx.send(config)
+            else:
+                print('cancel')
 
 
 
@@ -79,20 +102,29 @@ class DiscordBot():
             print(error)
 
 
-# class ConfigMenu(View):
-#     def __init__(self) -> None:
-#         super().__init__()
-
-#     @button(label="Clique aqui", style=discord.ButtonStyle.blurple)
-#     async def menu(self, button:discord.ui.Button, interarion:discord.Interaction):
-#         await interarion.reponse.send_message("CLIQUEI")
+class ConfigMenu(discord.ui.View):
     
-    # @button(label="Menu de opções", style=discord.ButtonStyle.blurple)
-    # async def menu(self, button:discord.ui.Button, interarion:discord.Interaction):
-    #     embed = Embed(color=discord.Color.random())
-    #     embed.set_author(name="Editar")
-    #     embed.add_field(name="aaa", value="vbbcv")
-    #     await interarion.response.edit_message(embed=embed)
-        
-        
-
+    foo : bool = None
+    option_1: bool = None
+    option_2: bool = None
+    
+    async def disable_all_items(self):
+        for item in self.children:
+            item.disabled = True
+        await self.message.edit(view=self)
+    
+    async def on_timeout(self) -> None:
+        await self.message.channel.send("Timedout")
+        await self.disable_all_items()
+    
+    @discord.ui.button(label="1", style=discord.ButtonStyle.success)
+    async def hello(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.option_1 = True
+        await interaction.response.send_message("Option 1")
+        self.stop()
+    
+    @discord.ui.button(label="2", style=discord.ButtonStyle.red)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Option 2")
+        self.option_2 = False
+        self.stop()
