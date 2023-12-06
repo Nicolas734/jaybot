@@ -7,6 +7,7 @@ from discord.ext import commands
 from utils.config import Config
 from discord.ui import View, Button, button
 
+
 import discord
 
 
@@ -16,6 +17,7 @@ class DiscordBot():
         self._config = (config or Config())
         self._bot : Bot= self.create_client()
         self._load_configs()
+        self.init_atributes()
         self.add_events()
         self.add_commands()
 
@@ -83,13 +85,34 @@ class DiscordBot():
             view.message = message
             await view.wait()
             await view.disable_all_items()
-            if view.option_1 is None:
-                print("Timeout")
+            if view.option_1 is True:
+                channel = ctx.channel
+                print("Adicionar novas configurações")
+                msg = "Por favor envie o usuario do git que deseja monitorar."
+                await ctx.send(msg)
+                def check(m):
+                    return m.author == ctx.author and m.channel == channel
+                msg = await self._bot.wait_for("message",check=check)
+                self._user = msg.content
+                await msg.add_reaction("✅")
+
+                msg = "Por favor envie o repositorio que deseja monitorar."
+                await ctx.send(msg)
+                def check(m):
+                    return m.author == ctx.author and m.channel == channel
+                msg = await self._bot.wait_for("message",check=check)
+                self._repository = msg.content
+                await msg.add_reaction("✅")
+                await ctx.send("Configuração salva com sucesso.")
 
             elif view.option_2 is True:
-                print("Ok")
-                config = "Github User: {}\n Github repository: {}".format(self._user, self._repository)
-                await ctx.send(config)
+                print("Mostrar configurações atuais")
+                if self._user != "" and self._repository != "":
+                    config = "Github User: {}\nGithub repository: {}".format(self._user, self._repository)
+                    await ctx.send(config)
+                else:
+                    msg = "Nenhuma configuração encontrada."
+                    await ctx.send(msg)
             else:
                 print('cancel')
 
@@ -114,7 +137,7 @@ class ConfigMenu(discord.ui.View):
         await self.message.edit(view=self)
     
     async def on_timeout(self) -> None:
-        await self.message.channel.send("Timedout")
+        await self.message.channel.send("Timeout")
         await self.disable_all_items()
     
     @discord.ui.button(label="1", style=discord.ButtonStyle.success)
@@ -125,6 +148,6 @@ class ConfigMenu(discord.ui.View):
     
     @discord.ui.button(label="2", style=discord.ButtonStyle.red)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.option_2 = True
         await interaction.response.send_message("Option 2")
-        self.option_2 = False
         self.stop()
